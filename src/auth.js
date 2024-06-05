@@ -27,7 +27,8 @@ module.exports = {
       const req = response.request()
       // check if there's an Authorization header
       const authHeader = req.headers()['authorization']
-      if (authHeader && authHeader.includes(' ')) access_token = authHeader.split(' ')[1].trim()
+      if (authHeader && authHeader.includes(' '))
+        access_token = authHeader.split(' ')[1].trim()
       else if (response.url().endsWith('/token'))
         access_token = (await response.json()).access_token
     })
