@@ -1,4 +1,6 @@
-const puppeteer = require('puppeteer')
+const puppeteer = require('puppeteer-extra')
+const StealthPlugin = require('puppeteer-extra-plugin-stealth')
+puppeteer.use(StealthPlugin())
 const { log } = require('cozy-konnector-libs')
 const fs = require('fs')
 
@@ -25,7 +27,7 @@ module.exports = {
       const req = response.request()
       // check if there's an Authorization header
       const authHeader = req.headers()['authorization']
-      if (authHeader) access_token = authHeader.split(' ')[1].trim()
+      if (authHeader && authHeader.includes(' ')) access_token = authHeader.split(' ')[1].trim()
       else if (response.url().endsWith('/token'))
         access_token = (await response.json()).access_token
     })
@@ -65,7 +67,7 @@ module.exports = {
         .then(el => el.type(username))
       await page.$('input[type="password"]').then(el => el.type(password))
 
-      await page.waitForTimeout(1000)
+      await page.waitForTimeout(2000)
 
       await page
         .waitForSelector('::-p-text(Se connecter)', { timeout: 20000 })
