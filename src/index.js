@@ -65,10 +65,10 @@ class BNPEREConnector extends BaseKonnector {
   }
 
   parseOps(ops) {
-    return ops.map(op => {
+    return ops.flatMap(op => {
       const full_id = `${op.company}999${op.card}`
       const date = op.dateTime + '.000Z'
-      return {
+      let res = [{
         vendorId: op.id,
         vendorAccountId: full_id,
         amount: op.amount,
@@ -78,7 +78,16 @@ class BNPEREConnector extends BaseKonnector {
         currency: 'EUR',
         label: op.label,
         originalBankLabel: op.label
+      }];
+      if (op.code === 'ARBITRAGE') {
+        // just duplicate it with negative amount, use splat
+        res.push({
+          ...res[0],
+          vendorId: op.id + '11',
+          amount: -op.amount
+        })
       }
+      return res
     })
   }
 }
