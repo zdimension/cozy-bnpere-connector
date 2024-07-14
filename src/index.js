@@ -1,9 +1,11 @@
 const {
   log,
   cozyClient,
+  updateOrCreate,
   BaseKonnector,
   categorize
 } = require('cozy-konnector-libs')
+const moment = require('moment')
 const { getBNPEREData } = require('./bnpere')
 const { getToken } = require('./auth')
 const doctypes = require('cozy-doctypes')
@@ -43,6 +45,9 @@ class BNPEREConnector extends BaseKonnector {
       )
 
       log('info', savedAccounts)
+
+      const balances = await fetchBalances(savedAccounts)
+      await saveBalances(balances)
     } catch (e) {
       log('error', e)
       log('error', e.stack)
@@ -68,17 +73,19 @@ class BNPEREConnector extends BaseKonnector {
     return ops.flatMap(op => {
       const full_id = `${op.company}999${op.card}`
       const date = op.dateTime + '.000Z'
-      let res = [{
-        vendorId: op.id,
-        vendorAccountId: full_id,
-        amount: op.amount,
-        date: date,
-        dateOperation: date,
-        dateImport: new Date().toISOString(),
-        currency: 'EUR',
-        label: op.label,
-        originalBankLabel: op.label
-      }];
+      let res = [
+        {
+          vendorId: op.id,
+          vendorAccountId: full_id,
+          amount: op.amount,
+          date: date,
+          dateOperation: date,
+          dateImport: new Date().toISOString(),
+          currency: 'EUR',
+          label: op.label,
+          originalBankLabel: op.label
+        }
+      ]
       if (op.code === 'ARBITRAGE') {
         // just duplicate it with negative amount, use splat
         res.push({
@@ -90,6 +97,69 @@ class BNPEREConnector extends BaseKonnector {
       return res
     })
   }
+}
+
+const fetchBalances = accounts => {
+  const now = moment()
+  const todayAsString = now.format('YYYY-MM-DD')
+  const currentYear = now.year()
+
+  return Promise.all(
+    accounts.map(async account => {
+      const history = await getBalanceHistory(currentYear, account._id)
+      history.balances[todayAsString] = account.balance
+
+      return history
+    })
+  )
+}
+
+const getBalanceHistory = async (year, accountId) => {
+  const index = await cozyClient.data.defineIndex(
+    'io.cozy.bank.balancehistories',
+    ['year', 'relationships.account.data._id']
+  )
+  const options = {
+    selector: { year, 'relationships.account.data._id': accountId },
+    limit: 1
+  }
+  const [balance] = await cozyClient.data.query(index, options)
+
+  if (balance) {
+    log(
+      'info',
+      `Found a io.cozy.bank.balancehistories document for year ${year} and account ${accountId}`
+    )
+    return balance
+  }
+
+  log(
+    'info',
+    `io.cozy.bank.balancehistories document not found for year ${year} and account ${accountId}, creating a new one`
+  )
+  return getEmptyBalanceHistory(year, accountId)
+}
+
+const getEmptyBalanceHistory = (year, accountId) => {
+  return {
+    year,
+    balances: {},
+    metadata: {
+      version: 1
+    },
+    relationships: {
+      account: {
+        data: {
+          _id: accountId,
+          _type: 'io.cozy.bank.accounts'
+        }
+      }
+    }
+  }
+}
+
+const saveBalances = balances => {
+  return updateOrCreate(balances, 'io.cozy.bank.balancehistories', ['_id'])
 }
 
 const connector = new BNPEREConnector({
