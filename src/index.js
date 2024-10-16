@@ -64,7 +64,7 @@ class BNPEREConnector extends BaseKonnector {
         institutionLabel: 'BNP Paribas Épargne Salariale',
         label: card.name,
         balance: card.totalAmount,
-        type: 'Savings'
+        type: 'LongTermSavings'
       }
     })
   }
@@ -72,7 +72,7 @@ class BNPEREConnector extends BaseKonnector {
   parseOps(ops) {
     return ops.flatMap(op => {
       const full_id = `${op.company}999${op.card}`
-      const date = op.dateTime + '.000Z'
+      const date = op.dateTime + '.001Z'
       let res = [
         {
           vendorId: op.id,
@@ -90,6 +90,7 @@ class BNPEREConnector extends BaseKonnector {
         // just duplicate it with negative amount, use splat
         res.push({
           ...res[0],
+          date: op.dateTime + '.000Z',
           vendorId: op.id + '11',
           amount: -op.amount
         })

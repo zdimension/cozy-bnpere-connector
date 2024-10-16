@@ -57,6 +57,11 @@ class BNPEREApi {
         const plan = plans[0]
         op.company = company
         op.card = plan.planId
+        if (detail.code === 'ABD') {
+          op.amount = detail.abundanceNetAmount
+        } else if (detail.code === 'ARBITRAGE') {
+          op.amount = detail.instructions[0].amountNet
+        }
       })
     )
     return rawOps
