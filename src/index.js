@@ -25,11 +25,24 @@ class BNPEREConnector extends BaseKonnector {
       cozyClient.new.login()
     }
 
+    /*
+    await cozyClient.jobs.create('service', {
+      name: 'categorization',
+      slug: 'banks'
+    })
+    return
+    */
+
     if (this.browser) {
       await this.browser.close()
     }
     try {
       const token = await getToken(this, fields.login, fields.password)
+      if (!token) {
+        log('error', 'Failed to get token')
+        
+        return
+      }
       const [cards, ops] = await getBNPEREData(fields.login, token)
 
       log('info', 'Successfully fetched data')
@@ -71,6 +84,7 @@ class BNPEREConnector extends BaseKonnector {
 
   parseOps(ops) {
     return ops.flatMap(op => {
+      console.log(op)
       const full_id = `${op.company}999${op.card}`
       const date = op.dateTime + '.001Z'
       let res = [

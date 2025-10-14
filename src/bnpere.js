@@ -11,6 +11,7 @@ class BNPEREApi {
     const myHeaders = new Headers()
     myHeaders.append('Authorization', 'Bearer ' + token)
     myHeaders.append('Content-Type', 'application/json')
+    myHeaders.append('x-api-version', '2.0.0')
     this.headers = myHeaders
   }
 
@@ -36,30 +37,32 @@ class BNPEREApi {
   }
 
   async getAllOperations(company) {
-    const rawOps = (await this.fetch(`companies/${company}/operations`)).filter(
+    let offsetRC = 0
+    let offsetES = 0
+    const opss = []
+    while (true) {
+      const ops = await this.fetch(
+        `companies/${company}/operations?offsetRC=${offsetRC}&offsetES=${offsetES}&take=50`
+      )
+      if (ops.operations.length === 0) break
+      opss.push(...ops.operations)
+      offsetRC = ops.nextOffsetRC
+      offsetES = ops.nextOffsetES
+    }
+    const rawOps = (opss).filter(
       op => op.statusCode === 'Termine'
     )
-    log('info', JSON.stringify(rawOps))
 
     await Promise.all(
       rawOps.map(async op => {
         const detail = await this.fetch(
           `companies/${company}/operations/detail/${op.id}`
         )
-        const plans = detail.destination.plans
-        if (plans.length !== 1) {
-          log(
-            'warn',
-            `Unexpected number of plans: ${plans.length} for op ${op.id}`
-          )
-          return
-        }
-        const plan = plans[0]
         op.company = company
-        op.card = plan.planId
-        if (detail.code === 'ABD') {
+        op.card = op.planId
+        if (detail.code === 'COMPTABLE_ABONDEMENT') {
           op.amount = detail.abundanceNetAmount
-        } else if (detail.code === 'ARBITRAGE') {
+        } else if (detail.code === 'TRANSFERT') {
           op.amount = detail.instructions[0].amountNet
         }
       })
